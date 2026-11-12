@@ -67,25 +67,30 @@ class _HomeScreenState extends State<HomeScreen> {
     String studentId = studentData['student_id'] ?? '-';
     String majorFaculty = "${studentData['major'] ?? '-'} ${studentData['faculty'] ?? ''}";
     
-    int presentCount = studentData['present_count'] ?? 3;
-    int lateCount = studentData['late_count'] ?? 1;
+    int presentCount = studentData['present_count'] ?? 0;
+    int lateCount = studentData['late_count'] ?? 0;
     int absentCount = studentData['absent_count'] ?? 0;
-    int totalClasses = presentCount + lateCount + absentCount;
-    double attendancePercentage = totalClasses > 0 ? ((presentCount + lateCount) / totalClasses) * 100 : 100;
+    int leaveCount = studentData['leave_count'] ?? 0; // 📌 ดึงจำนวนครั้งที่ลา
+
+    // 📌 คำนวณอัตราการเข้าเรียน: ไม่นำการลา (leaveCount) มาคิดเป็นตัวหารหรือตัวหักคะแนน
+    // (คิดเฉพาะคาบที่ต้องมาเรียนจริง คือ มา + สาย + ขาด)
+    int effectiveClasses = presentCount + lateCount + absentCount;
+    double attendancePercentage = effectiveClasses > 0 
+        ? ((presentCount + lateCount) / effectiveClasses) * 100 
+        : 100;
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('หน้าหลัก', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         elevation: 0,
-        // 📌 นำ CircleAvatar ออกจาก actions แล้ว
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ส่วนโปรไฟล์นักศึกษา (เอาวงกลม CircleAvatar ด้านขวาออกแล้ว)
+            // ส่วนโปรไฟล์นักศึกษา
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -140,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       const Text('เกณฑ์ขั้นต่ำ 80%', style: TextStyle(color: Colors.white70, fontSize: 12)),
-                      Text('$totalClasses ครั้ง', style: const TextStyle(color: Colors.white70, fontSize: 12)),
+                      Text('เรียนจริง $effectiveClasses ครั้ง (ลา $leaveCount ครั้ง)', style: const TextStyle(color: Colors.white70, fontSize: 12)),
                     ],
                   )
                 ],
@@ -148,12 +153,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 16),
 
-            // กล่องสถิติย่อย
+            // 📊 กล่องสถิติย่อย 4 สถานะ (มา, สาย, ขาด, ลา)
             Row(
               children: [
                 _buildStatBox(presentCount.toString(), 'มา', Colors.green.shade50, Colors.green),
                 _buildStatBox(lateCount.toString(), 'สาย', Colors.orange.shade50, Colors.orange),
                 _buildStatBox(absentCount.toString(), 'ขาด', Colors.red.shade50, Colors.red),
+                _buildStatBox(leaveCount.toString(), 'ลา', Colors.blue.shade50, Colors.blue),
               ],
             ),
             const SizedBox(height: 16),
@@ -235,13 +241,13 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildStatBox(String count, String label, Color bg, Color text) {
     return Expanded(
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4),
+        margin: const EdgeInsets.symmetric(horizontal: 3),
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(12)),
         child: Column(
           children: [
             Text(count, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: text)),
-            Text(label, style: TextStyle(fontSize: 12, color: text)),
+            Text(label, style: TextStyle(fontSize: 12, color: text, fontWeight: FontWeight.w500)),
           ],
         ),
       ),

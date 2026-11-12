@@ -66,7 +66,7 @@ class _TeacherReportsScreenState extends State<TeacherReportsScreen> {
     }
   }
 
-  // 📥 ฟังก์ชัน Export ข้อมูลเป็นไฟล์ Excel
+  // 📥 ฟังก์ชัน Export ข้อมูลเป็นไฟล์ Excel (เพิ่มช่อง ลา และ สาเหตุการลา)
   void _exportToExcel() {
     if (selectedSubject == null || studentsReportList.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -89,6 +89,8 @@ class _TeacherReportsScreenState extends State<TeacherReportsScreen> {
       excel_lib.TextCellValue('มา (ครั้ง)'),
       excel_lib.TextCellValue('สาย (ครั้ง)'),
       excel_lib.TextCellValue('ขาด (ครั้ง)'),
+      excel_lib.TextCellValue('ลา (ครั้ง)'),
+      excel_lib.TextCellValue('สาเหตุการลา'),
     ]);
 
     for (var std in studentsReportList) {
@@ -101,6 +103,8 @@ class _TeacherReportsScreenState extends State<TeacherReportsScreen> {
         excel_lib.IntCellValue(std['present_count'] ?? 0),
         excel_lib.IntCellValue(std['late_count'] ?? 0),
         excel_lib.IntCellValue(std['absent_count'] ?? 0),
+        excel_lib.IntCellValue(std['leave_count'] ?? 0),
+        excel_lib.TextCellValue(std['leave_notes']?.toString() ?? '-'),
       ]);
     }
 
@@ -161,7 +165,7 @@ class _TeacherReportsScreenState extends State<TeacherReportsScreen> {
                         items: subjectsList.map((sub) {
                           return DropdownMenuItem(
                             value: sub,
-                            child: Text('${sub['code']} - ${sub['name']} (Sec ${sub['section']})'),
+                            child: Text('${sub['code']} ${sub['name']} (Sec ${sub['section']})'),
                           );
                         }).toList(),
                         onChanged: (val) {
@@ -189,6 +193,7 @@ class _TeacherReportsScreenState extends State<TeacherReportsScreen> {
                             int present = std['present_count'] ?? 0;
                             int late = std['late_count'] ?? 0;
                             int absent = std['absent_count'] ?? 0;
+                            int leave = std['leave_count'] ?? 0;
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 8),
@@ -201,21 +206,24 @@ class _TeacherReportsScreenState extends State<TeacherReportsScreen> {
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text('${std['student_id']}  ${std['full_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                      const SizedBox(height: 2),
-                                      Text('คณะ: ${std['faculty'] ?? '-'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                    ],
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Text('${std['student_id']}  ${std['full_name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        const SizedBox(height: 2),
+                                        Text('คณะ: ${std['faculty'] ?? '-'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                      ],
+                                    ),
                                   ),
-                                  Row(
+                                  Wrap(
+                                    spacing: 4,
+                                    runSpacing: 4,
                                     children: [
                                       _buildBadge('มา: $present', Colors.green),
-                                      const SizedBox(width: 6),
                                       _buildBadge('สาย: $late', Colors.orange),
-                                      const SizedBox(width: 6),
                                       _buildBadge('ขาด: $absent', Colors.red),
+                                      _buildBadge('ลา: $leave', Colors.blue),
                                     ],
                                   )
                                 ],

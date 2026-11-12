@@ -21,6 +21,19 @@ class _TeacherManualAttendanceScreenState extends State<TeacherManualAttendanceS
   bool isSaving = false;
   
   final Map<int, String?> attendanceStatus = {};
+  final Map<int, String> attendanceNotes = {};
+  
+  // 📌 เพิ่ม Map เก็บ TextEditingController ของแต่ละนักศึกษา เพื่อไม่ให้ช่องพิมพ์หาย/รีเซ็ตเวลาพิมพ์
+  final Map<int, TextEditingController> _noteControllers = {};
+
+  @override
+  void dispose() {
+    // เคลียร์ Controller เมื่อออกจากหน้าจอเพื่อป้องกัน Memory Leak
+    for (var controller in _noteControllers.values) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
 
   @override
   void initState() {
@@ -28,7 +41,7 @@ class _TeacherManualAttendanceScreenState extends State<TeacherManualAttendanceS
     _fetchStudents();
   }
 
-Future<void> _fetchStudents() async {
+  Future<void> _fetchStudents() async {
     String urlStr = 'http://127.0.0.1:8000/api/teacher/subjects/${widget.subjectId}/students';
     if (widget.sessionId != null) {
       urlStr += '?session_id=${widget.sessionId}';
@@ -46,9 +59,19 @@ Future<void> _fetchStudents() async {
           int studentId = student['user_id'];
           uniqueMap[studentId] = student;
           
-          // 📌 สำคัญ: ให้ค่าเริ่มต้นเป็น null เสมอ (ยังไม่เลือก) 
-          // จะดึงค่าจาก DB เฉพาะเมื่อเคยมีการบันทึกใน session_id นี้แล้วเท่านั้น
           attendanceStatus[studentId] = student['current_status']; 
+          
+          String initialNote = student['note'] ?? '';
+          if (initialNote.isNotEmpty) {
+            attendanceNotes[studentId] = initialNote;
+          }
+          
+          // กำหนดค่าให้ Controller ของแต่ละคนอย่างแม่นยำ
+          if (_noteControllers.containsKey(studentId)) {
+            _noteControllers[studentId]?.text = initialNote;
+          } else {
+            _noteControllers[studentId] = TextEditingController(text: initialNote);
+          }
         }
 
         setState(() {
@@ -95,6 +118,7 @@ Future<void> _fetchStudents() async {
       records.add({
         "student_id": studentId,
         "status": status ?? 'absent',
+        "note": attendanceNotes[studentId] ?? _noteControllers[studentId]?.text ?? '',
       });
     });
 
@@ -113,6 +137,8 @@ Future<void> _fetchStudents() async {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('บันทึกผลการเช็คชื่อสำเร็จ!'), backgroundColor: Colors.green),
         );
+        // หากต้องการให้อยู่หน้าเดิมต่อเพื่อตรวจสอบข้อมูล ให้เอา Navigator.pop ออก 
+        // หรือถ้าต้องการกลับหน้าก่อนหน้า ให้แน่ใจว่าบันทึกสำเร็จแล้วค่อย pop
         Navigator.pop(context);
       } else {
         throw Exception('บันทึกไม่สำเร็จ');
@@ -122,7 +148,9 @@ Future<void> _fetchStudents() async {
         SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red),
       );
     } finally {
-      setState(() => isSaving = false);
+      if (mounted) {
+        setState(() => isSaving = false);
+      }
     }
   }
 
@@ -148,7 +176,16 @@ Future<void> _fetchStudents() async {
                         itemBuilder: (context, index) {
                           var student = students[index];
                           int studentId = student['user_id'];
+
+                          if (!attendanceStatus.containsKey(studentId)) {
+                            attendanceStatus[studentId] = null;
+                          }
                           String? currentStatus = attendanceStatus[studentId];
+
+                          // ตรวจสอบและสร้าง Controller สำรองเผื่อกรณีข้อมูลมาทีหลัง
+                          if (!_noteControllers.containsKey(studentId)) {
+                            _noteControllers[studentId] = TextEditingController();
+                          }
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
@@ -158,27 +195,59 @@ Future<void> _fetchStudents() async {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(color: Colors.grey.shade200),
                             ),
-                            child: Row(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(student['full_name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                                      const SizedBox(height: 2),
-                                      Text('รหัส: ${student['student_id'] ?? '-'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                                    ],
-                                  ),
-                                ),
                                 Row(
                                   children: [
-                                    _buildStatusButton(studentId, 'มา', 'present', Colors.green, currentStatus),
-                                    const SizedBox(width: 4),
-                                    _buildStatusButton(studentId, 'สาย', 'late', Colors.orange, currentStatus),
-                                    const SizedBox(width: 4),
-                                    _buildStatusButton(studentId, 'ขาด', 'absent', Colors.red, currentStatus),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(student['full_name'] ?? '-', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                                          const SizedBox(height: 2),
+                                          Text('รหัส: ${student['student_id'] ?? '-'}', style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                                        ],
+                                      ),
+                                    ),
+                                    Wrap(
+                                      spacing: 4,
+                                      runSpacing: 4,
+                                      children: [
+                                        _buildStatusButton(studentId, 'มา', 'present', Colors.green, currentStatus),
+                                        _buildStatusButton(studentId, 'สาย', 'late', Colors.orange, currentStatus),
+                                        _buildStatusButton(studentId, 'ขาด', 'absent', Colors.red, currentStatus),
+                                        _buildStatusButton(studentId, 'ลา', 'leave', Colors.blue, currentStatus),
+                                      ],
+                                    ),
                                   ],
                                 ),
+                                
+                                // แสดงช่องหมายเหตุเฉพาะเมื่อเลือกสถานะเป็น "ลา" (leave)
+                                if (currentStatus == 'leave') ...[
+                                  const SizedBox(height: 10),
+                                  TextField(
+                                    controller: _noteControllers[studentId], // 📌 ใช้ Controller ที่ผูกไว้ถาวร
+                                    onChanged: (value) {
+                                      attendanceNotes[studentId] = value;
+                                    },
+                                    decoration: InputDecoration(
+                                      hintText: 'ระบุเหตุผลการลา...',
+                                      hintStyle: const TextStyle(fontSize: 12, color: Colors.grey),
+                                      isDense: true,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: BorderSide(color: Colors.grey.shade300),
+                                      ),
+                                      focusedBorder: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(8),
+                                        borderSide: const BorderSide(color: Color(0xFF2563EB)),
+                                      ),
+                                    ),
+                                    style: const TextStyle(fontSize: 13),
+                                  ),
+                                ],
                               ],
                             ),
                           );
@@ -214,10 +283,14 @@ Future<void> _fetchStudents() async {
       onTap: () {
         setState(() {
           attendanceStatus[studentId] = statusValue;
+          if (statusValue != 'leave') {
+            attendanceNotes.remove(studentId);
+            _noteControllers[studentId]?.clear(); // เคลียร์ข้อความในช่องพิมพ์เมื่อเปลี่ยนไปสถานะอื่น
+          }
         });
       },
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: isSelected ? activeColor : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(8),

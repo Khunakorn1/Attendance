@@ -167,6 +167,10 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
                         course['name'] ?? '-',
                         course['schedule'] ?? 'ไม่ระบุเวลา',
                         course['room'] ?? '-',
+                        course['present_count'] ?? 0,
+                        course['late_count'] ?? 0,
+                        course['absent_count'] ?? 0,
+                        course['leave_count'] ?? 0,
                       );
                     },
                   ),
@@ -174,7 +178,18 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
     );
   }
 
-  Widget _buildCourseCard(BuildContext context, int subjectId, String code, String title, String schedule, String room) {
+  Widget _buildCourseCard(
+    BuildContext context, 
+    int subjectId, 
+    String code, 
+    String title, 
+    String schedule, 
+    String room,
+    int present,
+    int late,
+    int absent,
+    int leave,
+  ) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -220,6 +235,20 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
           Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
           const SizedBox(height: 4),
           Text('⏰ เวลาเรียน: $schedule', style: const TextStyle(color: Colors.grey, fontSize: 13)),
+          const SizedBox(height: 12),
+          
+          // 📌 แสดง Badge สรุปสถานะการเข้าเรียน (รวมถึง "ลา")
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              _buildBadge('มา: $present', Colors.green),
+              _buildBadge('สาย: $late', Colors.orange),
+              _buildBadge('ขาด: $absent', Colors.red),
+              _buildBadge('ลา: $leave', Colors.blue),
+            ],
+          ),
+
           const Divider(height: 24),
           SizedBox(
             width: double.infinity,
@@ -247,6 +276,14 @@ class _StudentCoursesScreenState extends State<StudentCoursesScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildBadge(String text, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(color: color.withOpacity(0.1), borderRadius: BorderRadius.circular(6)),
+      child: Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
     );
   }
 
